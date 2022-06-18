@@ -7,14 +7,23 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
-const None string = "None"
+const (
+	None        string = "None"
+	dateForm    string = "2006-01-02"
+	csv_file    string = "data.csv"
+	calculators int    = 10
+)
 
-const dateForm string = "2006-01-02"
+type counter int32
 
-const csv_file string = "data.csv"
+func (c *counter) inc() int32 {
+	return atomic.AddInt32((*int32)(c), 1)
+}
 
 type Converter interface {
 	Convert(arg string)
@@ -92,49 +101,18 @@ type record struct {
 }
 
 func parseRecord(args []string) *record {
-	var cust_id str
-	Parser(args[0], &cust_id)
-
-	var start_date date
-	Parser(args[1], &start_date)
-
-	var end_date date
-	Parser(args[2], &end_date)
-
-	var trans_id str
-	Parser(args[3], &trans_id)
-
-	var date date
-	Parser(args[4], &date)
-
-	var year integer
-	Parser(args[5], &year)
-
-	var mounth integer
-	Parser(args[6], &mounth)
-
-	var day integer
-	Parser(args[7], &day)
-
-	var exp_type str
-	Parser(args[8], &exp_type)
-
-	var amount amount
-	Parser(args[9], &amount)
-
-	r := record{
-		cust_id:    cust_id,
-		start_date: start_date,
-		end_date:   end_date,
-		trans_id:   trans_id,
-		date:       date,
-		year:       year,
-		mounth:     mounth,
-		day:        day,
-		exp_type:   exp_type,
-		amount:     amount,
-	}
-	return &r
+	var res record
+	Parser(args[0], &res.cust_id)
+	Parser(args[1], &res.start_date)
+	Parser(args[2], &res.end_date)
+	Parser(args[3], &res.trans_id)
+	Parser(args[4], &res.date)
+	Parser(args[5], &res.year)
+	Parser(args[6], &res.mounth)
+	Parser(args[7], &res.day)
+	Parser(args[8], &res.exp_type)
+	Parser(args[9], &res.amount)
+	return &res
 }
 
 func (r record) String() string {
@@ -183,8 +161,18 @@ func main() {
 	first := parseFile(csv_file)
 	second := mappingStruct(first)
 
-	for {
-		out := <-second
-		fmt.Println(out)
+	var c counter
+
+	var wg sync.WaitGroup
+	wg.Add(calculators)
+	for i := 0; i < calculators; i++ {
+		go func() {
+			for range second {
+				c.inc()
+			}
+			wg.Done()
+		}()
 	}
+	wg.Wait()
+	fmt.Println(c)
 }
