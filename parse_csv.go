@@ -10,72 +10,136 @@ import (
 	"time"
 )
 
+const None string = "None"
+
 const dateForm string = "2006-01-02"
 
 const csv_file string = "data.csv"
 
-func parseDate(arg string) time.Time {
+type Converter interface {
+	Convert(arg string)
+}
+
+func Parser(arg string, v Converter) {
+	v.Convert(arg)
+}
+
+type date time.Time
+
+func (d date) String() string {
+	nt := time.Time(d)
+	if nt.IsZero() {
+		return None
+	}
+	return fmt.Sprintf("%v", nt.Format(dateForm))
+}
+
+func (d *date) Convert(arg string) {
 	if arg == "" {
-		return time.Time{}
+		*d = date(time.Time{})
+	} else {
+		t, err := time.Parse(dateForm, arg)
+		if err != nil {
+			log.Print(err)
+			*d = date(time.Time{})
+		}
+		*d = date(t)
 	}
-	t, err := time.Parse(dateForm, arg)
-	if err != nil {
-		log.Print(err)
-		return time.Time{}
-	}
-	return t
 }
 
-func parseInt(arg string) int {
-	i, err := strconv.Atoi(arg)
+type integer int
+
+func (i *integer) Convert(arg string) {
+	n, err := strconv.Atoi(arg)
 	if err != nil {
 		log.Print(err)
-		return 0
+		*i = 0
 	}
-	return i
+	*i = integer(n)
 }
 
-func parseFloat(arg string) float64 {
+type amount float64
+
+func (f *amount) Convert(arg string) {
 	s, err := strconv.ParseFloat(arg, 32)
 	if err != nil {
 		log.Print(err)
-		return 0
+		*f = 0.0
 	}
-	return s
+	*f = amount(s)
+}
 
+type str string
+
+func (s *str) Convert(arg string) {
+	*s = str(arg)
 }
 
 // names = ['CUST_ID', 'START_DATE', 'END_DATE', 'TRANS_ID', 'DATE', 'YEAR',
 // 'MONTH', 'DAY', 'EXP_TYPE', 'AMOUNT']
 
 type record struct {
-	cust_id    string
-	start_date time.Time
-	end_date   time.Time
-	trans_id   string
-	date       time.Time
-	year       int
-	mounth     int
-	day        int
-	exp_type   string
-	amount     float64
+	cust_id    str
+	start_date date
+	end_date   date
+	trans_id   str
+	date       date
+	year       integer
+	mounth     integer
+	day        integer
+	exp_type   str
+	amount     amount
 }
 
 func parseRecord(args []string) *record {
+	var cust_id str
+	Parser(args[0], &cust_id)
+
+	var start_date date
+	Parser(args[1], &start_date)
+
+	var end_date date
+	Parser(args[2], &end_date)
+
+	var trans_id str
+	Parser(args[3], &trans_id)
+
+	var date date
+	Parser(args[4], &date)
+
+	var year integer
+	Parser(args[5], &year)
+
+	var mounth integer
+	Parser(args[6], &mounth)
+
+	var day integer
+	Parser(args[7], &day)
+
+	var exp_type str
+	Parser(args[8], &exp_type)
+
+	var amount amount
+	Parser(args[9], &amount)
+
 	r := record{
-		cust_id:    args[0],
-		start_date: parseDate(args[1]),
-		end_date:   parseDate(args[2]),
-		trans_id:   args[3],
-		date:       parseDate(args[4]),
-		year:       parseInt(args[5]),
-		mounth:     parseInt(args[6]),
-		day:        parseInt(args[7]),
-		exp_type:   args[8],
-		amount:     parseFloat(args[9]),
+		cust_id:    cust_id,
+		start_date: start_date,
+		end_date:   end_date,
+		trans_id:   trans_id,
+		date:       date,
+		year:       year,
+		mounth:     mounth,
+		day:        day,
+		exp_type:   exp_type,
+		amount:     amount,
 	}
 	return &r
+}
 
+func (r record) String() string {
+	return fmt.Sprintf("%v, %v, %v, %v, %v, %v, %v, %v, %v, %.2f",
+		r.cust_id, r.start_date, r.end_date, r.trans_id, r.date, r.year, r.mounth, r.day, r.exp_type, r.amount)
 }
 
 func check(e error) {
@@ -121,6 +185,6 @@ func main() {
 
 	for {
 		out := <-second
-		fmt.Print(out.start_date)
+		fmt.Println(out)
 	}
 }
