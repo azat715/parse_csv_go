@@ -17,6 +17,7 @@ const (
 	dateForm    string = "2006-01-02"
 	csv_file    string = "data.csv"
 	calculators int    = 10
+	buf_size    int    = 2000
 )
 
 type counter int32
@@ -126,31 +127,43 @@ func check(e error) {
 	}
 }
 
-func parseFile(file string) <-chan []string {
-	out := make(chan []string)
+func parseFile(file string) <-chan [buf_size][]string {
+	out := make(chan [buf_size][]string)
 
 	f, err := os.Open(file)
 	check(err)
 	parser := csv.NewReader(f)
 	go func() {
+	out:
 		for {
-			record, err := parser.Read()
-			if err == io.EOF {
-				break
+			var buffer [buf_size][]string
+			for i := 0; i < buf_size; i++ {
+				record, err := parser.Read()
+				if err == io.EOF {
+					out <- buffer
+					break out
+				}
+				check(err)
+				buffer[i] = record
 			}
-			check(err)
-			out <- record
+			out <- buffer
 		}
 		close(out)
 	}()
 	return out
 }
 
-func mappingStruct(in <-chan []string) <-chan record {
+func mappingStruct(in <-chan [buf_size][]string) <-chan record {
 	out := make(chan record)
 	go func() {
-		for record := range in {
-			out <- *parseRecord(record)
+		for item := range in {
+			for _, v := range item {
+				if len(v) > 0 {
+					out <- *parseRecord(v)
+				} else {
+					break
+				}
+			}
 		}
 		close(out)
 	}()
